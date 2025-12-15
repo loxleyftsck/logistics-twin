@@ -1,0 +1,49 @@
+# Docker ignore patterns
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Data files (use volumes instead)
+*.pkl
+*.npy
+q_table.npy
+
+# Environment
+.env
+.env.local
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# CI/CD
+.github/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

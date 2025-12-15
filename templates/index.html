@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Logistics Twin (V5.3 Interpretability)</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+
+    <style>
+        :root {
+            --sidebar-bg: rgba(255, 255, 255, 0.96);
+            --sidebar-border: rgba(255, 255, 255, 0.5);
+        }
+
+        [data-bs-theme="dark"] {
+            --sidebar-bg: rgba(33, 37, 41, 0.96);
+            --sidebar-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            border-right: 4px solid #34495e;
+            z-index: 1;
+        }
+
+        [data-bs-theme="dark"] .leaflet-layer {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        .sidebar-container {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            transition: transform 0.4s ease;
+        }
+
+        .sidebar-container.collapsed {
+            transform: translateX(420px);
+        }
+
+        .sidebar {
+            width: 400px;
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(12px);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--sidebar-border);
+            max-height: 96vh;
+            overflow-y: auto;
+        }
+
+        .toggle-btn {
+            background: var(--sidebar-bg);
+            border: 1px solid var(--sidebar-border);
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            color: var(--bs-body-color);
+        }
+
+        .stats-font {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+        }
+
+        .agent-card {
+            background: var(--bs-body-bg);
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-left: 4px solid #ccc;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .agent-card:hover {
+            transform: translateX(-3px);
+            box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .agent-card.hidden-agent {
+            opacity: 0.5;
+            filter: grayscale(100%);
+        }
+
+        .text-profit {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .text-loss {
+            color: #c0392b;
+            font-weight: bold;
+        }
+
+        /* V5.2.5: Tab Navigation Styling */
+        .nav-pills {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .nav-pills .nav-link {
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 11px;
+            padding: 8px 10px;
+            color: #555;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+        }
+
+        .nav-pills .nav-link:hover {
+            background: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+            border-color: #667eea;
+        }
+
+        /* V5.2.5: Tab Content Transitions */
+        .tab-pane {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* V5.2.5: Compact Card Padding */
+        .tab-content .card-body {
+            padding: 0.5rem !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div class="sidebar-container" id="sidebarContainer">
+        <button class="toggle-btn" onclick="toggleSidebar()"><i class="bi bi-list fs-5"></i></button>
+        <div class="sidebar">
+            <!-- V5.2.5: Header with Version -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <h5 class="fw-bold m-0"><i class="bi bi-cpu-fill"></i> Logistics Twin</h5>
+                    <small class="text-muted" style="font-size:10px;">V5.6.1 • PRODUCTION READY</small>
+                </div>
+            </div>
+
+            <!-- V5.2.5: Bootstrap Nav Tabs -->
+            <ul class="nav nav-pills nav-fill mb-2" id="sidebarTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="ops-tab" data-bs-toggle="pill" data-bs-target="#tab-ops"
+                        type="button" role="tab">
+                        <i class="bi bi-play-circle-fill"></i> <small>OPS</small>
+                        <span class="spinner-border spinner-border-sm d-none" id="ops-spinner"
+                            style="width:12px;height:12px;margin-left:4px;"></span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link position-relative" id="chaos-tab" data-bs-toggle="pill"
+                        data-bs-target="#tab-chaos" type="button" role="tab">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <small>CHAOS</small>
+                        <span
+                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                            id="chaos-badge" style="font-size:9px;">0</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="data-tab" data-bs-toggle="pill" data-bs-target="#tab-data"
+                        type="button" role="tab">
+                        <i class="bi bi-bar-chart-fill"></i> <small>DATA</small>
+                    </button>
+                </li>
+            </ul>
+
+            <!-- V5.2.5: Tab Content -->
+            <div class="tab-content" id="sidebarTabContent">
+
+                <!-- OPS TAB -->
+                <div class="tab-pane fade show active" id="tab-ops" role="tabpanel">
+                    <div class="d-grid gap-2 mb-2">
+                        <button id="btnFastTrain" class="btn btn-primary fw-bold shadow-sm py-2"
+                            onclick="toggleTraining()">
+                            <i class="bi bi-play-circle-fill"></i> START SIMULATION
+                        </button>
+                    </div>
+
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-header bg-success text-white py-1 fw-bold small">
+                            <i class="bi bi-floppy"></i> BRAIN MANAGEMENT
+                        </div>
+                        <div class="card-body p-1">
+                            <div class="d-grid gap-1">
+                                <button class="btn btn-sm btn-outline-success" onclick="saveBrain()">
+                                    <i class="bi bi-save"></i> Save Brain
+                                </button>
+                                <label class="btn btn-sm btn-outline-primary mb-0">
+                                    <i class="bi bi-folder2-open"></i> Load Brain
+                                    <input type="file" id="brainUpload" accept=".json" style="display:none;"
+                                        onchange="loadBrain(this)">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-header bg-info text-white py-1 fw-bold small">
+                            <i class="bi bi-sliders"></i> CONFIGURATION
+                        </div>
+                        <div class="card-body p-1">
+                            <div class="d-grid gap-1">
+                                <button class="btn btn-sm btn-outline-info" onclick="openFleetConfig()">
+                                    <i class="bi bi-truck"></i> Fleet Config
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" onclick="toggleHeatmap()">
+                                    <i id="heatIcon" class="bi bi-fire"></i> Toggle Heatmap
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()">
+                                    <i id="themeIcon" class="bi bi-moon-stars-fill"></i> Toggle Theme
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="resetSim()">
+                                    <i class="bi bi-trash"></i> Reset Simulation
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CHAOS TAB -->
+                <div class="tab-pane fade" id="tab-chaos" role="tabpanel">
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-header bg-danger text-white py-1 fw-bold small">
+                            <i class="bi bi-exclamation-triangle-fill"></i> DISASTER MAKER
+                        </div>
+                        <div class="card-body p-1">
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-1">Severity Level:</label>
+                                <div class="btn-group w-100 btn-group-sm" role="group">
+                                    <input type="radio" class="btn-check" name="disasterSeverity" id="severity1"
+                                        value="1">
+                                    <label class="btn btn-outline-warning" for="severity1">
+                                        <small>🌧️ L1</small><br>
+                                        <small style="font-size:8px;">Genangan</small>
+                                    </label>
+                                    <input type="radio" class="btn-check" name="disasterSeverity" id="severity2"
+                                        value="2" checked>
+                                    <label class="btn btn-outline-warning" for="severity2"
+                                        style="border-color:#ff6f00;color:#ff6f00;">
+                                        <small>🌊 L2</small><br>
+                                        <small style="font-size:8px;">Banjir</small>
+                                    </label>
+                                    <input type="radio" class="btn-check" name="disasterSeverity" id="severity3"
+                                        value="3">
+                                    <label class="btn btn-outline-danger" for="severity3">
+                                        <small>🚫 L3</small><br>
+                                        <small style="font-size:8px;">Putus</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-1">Radius: <span id="radiusValue">50</span>
+                                    km</label>
+                                <input type="range" class="form-range" id="disasterRadius" min="10" max="100" value="50"
+                                    step="5" oninput="document.getElementById('radiusValue').textContent = this.value">
+                            </div>
+                            <div class="text-center small text-muted mb-2" id="disasterStatus">
+                                <i class="bi bi-crosshair"></i> Click map to spawn disaster
+                            </div>
+                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="clearDisasters()">
+                                <i class="bi bi-trash"></i> Clear All Disasters
+                            </button>
+                            <div class="mt-2 small text-center">
+                                <span class="text-muted">Active:</span> <span id="disasterCount"
+                                    class="badge bg-danger">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-header bg-warning text-dark py-1 fw-bold small">
+                            <i class="bi bi-lightning-charge-fill"></i> DISRUPTION SCENARIOS
+                        </div>
+                        <div class="card-body p-1">
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <button class="btn btn-outline-danger w-100 btn-sm fw-bold"
+                                        onclick="applyScenario('pantura')">
+                                        ⛔ BLOCK<br>PANTURA
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button class="btn btn-outline-success w-100 btn-sm fw-bold"
+                                        onclick="applyScenario('normal')">
+                                        ✅ RESTORE<br>ALL
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- P0.2: Disaster Impact Preview -->
+                    <div class="card mb-2 border-0 shadow-sm bg-info-subtle">
+                        <div class="card-header bg-info text-white py-1 fw-bold small">
+                            <i class="bi bi-calculator"></i> IMPACT CALCULATOR
+                        </div>
+                        <div class="card-body p-1">
+                            <button class="btn btn-sm btn-outline-secondary w-100 mb-2" id="btnImpactPreview"
+                                onclick="toggleImpactPreview()">
+                                📊 Enable Impact Preview
+                            </button>
+                            <div id="impactPreviewPanel" class="small text-center text-muted">
+                                Hover map to preview disaster impact
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DATA TAB -->
+                <div class="tab-pane fade" id="tab-data" role="tabpanel">
+                    <!-- V5.3: Reputation Score Display -->
+                    <div class="card mb-2 border-0 shadow-sm bg-danger-subtle">
+                        <div class="card-body p-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold text-danger m-0"><i class="bi bi-heart-fill"></i> REPUTATION</h6>
+                                <small class="text-muted" style="font-size:9px;">Public Trust (Karma)</small>
+                            </div>
+                            <h3 class="fw-bold text-danger m-0" id="reputationScore">0</h3>
+                        </div>
+                    </div>
+
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-header py-1 fw-bold small d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-graph-up"></i> FLEET P&L</span>
+                            <span class="badge bg-secondary stats-font" id="dataSourceBadge">LIVE</span>
+                        </div>
+                        <div class="card-body p-1">
+                            <div id="agentStats" class="stats-font">
+                                <div class="text-center py-4 text-muted">Waiting for financial data...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div
+                            class="card-header bg-dark text-white py-1 fw-bold small d-flex justify-content-between align-items-center">
+                            <span>🏆 RANKING</span>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-xs btn-outline-light active" id="btnRankProfit"
+                                    onclick="setRankMode('profit')">PROFIT</button>
+                                <button class="btn btn-xs btn-outline-light" id="btnRankCost"
+                                    onclick="setRankMode('cost')">COST</button>
+                                <button class="btn btn-xs btn-outline-light" id="btnRankGreen"
+                                    onclick="setRankMode('green')">GREEN</button>
+                            </div>
+                        </div>
+                        <ul class="list-group list-group-flush small" id="hallOfFameList">
+                            <li class="list-group-item text-center text-muted">- No Data -</li>
+                        </ul>
+                    </div>
+
+                    <!-- P0.3: Agent Comparison Button -->
+                    <div class="card border-0 shadow-sm mt-2">
+                        <div class="card-body p-2">
+                            <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="showAgentComparison()">
+                                <i class="bi bi-bar-chart-fill"></i> Compare All Agents
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Hidden select elements -->
+            <div style="display:none"><select id="fromCity"></select><select id="toCity"></select></div>
+        </div>
+    </div>
+    <div class="modal fade" id="fleetModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Fleet Business Strategy</h5><button type="button"
+                        class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-striped mb-0 table-hover">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>Agent</th>
+                                <th>Vehicle (OpEx)</th>
+                                <th>Cargo (Revenue)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer bg-light"><small class="text-muted me-auto"><i>*Efficiency bonus: <300km=+25%,>
+                                1000km=-25%</i></small><button type="button" class="btn btn-success fw-bold"
+                        data-bs-dismiss="modal">Apply Strategy</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- P0.3: Agent Comparison Modal -->
+    <div class="modal fade" id="comparisonModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-bar-chart-fill"></i> Agent Policy Comparison</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <table class="table table-striped mb-0 table-hover">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>Agent</th>
+                                <th>Profit</th>
+                                <th>Distance</th>
+                                <th>CO2</th>
+                                <th>Convergence</th>
+                                <th>Diversity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer bg-light">
+                    <div class="me-auto">
+                        <small class="text-muted">
+                            <b>Winners:</b>
+                            💰 <span id="winnerProfit">-</span> |
+                            🌱 <span id="winnerGreen">-</span> |
+                            💸 <span id="winnerCost">-</span>
+                        </small>
+                    </div>
+                    <button type="button" class="btn btn-success fw-bold" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        var map = L.map('map').setView([-7.0, 110.0], 7);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB', maxZoom: 19 }).addTo(map);
+        var cityMarkers = {}, agentLayers = {}, lastRouteCache = {}, isTraining = false;
+        var visibleAgents = {}, lastDataCache = null; var cityNamesList = [], rawCityData = {}; var baseCostPerKm = 8000; var rankMode = 'profit';
+        var isHeatmapMode = false; var heatLayer = null; var accumulatedPoints = [];
+
+        // V5.0: Disaster Management State
+        var disasterCircles = [];  // P0 Fix #8: Track Leaflet circles for memory management
+        var isDisasterMode = false;   // State Guard (Default: false)
+        var clickDebounceTimer = null;  // P0 Fix #3: Click debouncing
+
+        const VEHICLES = { 'diesel': { label: 'Diesel Heavy', co2: 2.6, costMult: 1.0, icon: 'bi-truck' }, 'hybrid': { label: 'Hybrid Wingbox', co2: 1.8, costMult: 1.2, icon: 'bi-battery-half' }, 'ev': { label: 'Electric Semi', co2: 0.0, costMult: 1.6, icon: 'bi-lightning-charge' }, 'lng': { label: 'LNG Truck', co2: 1.2, costMult: 1.1, icon: 'bi-droplet' } };
+        const CARGO = { 'general': { label: 'General Goods 📦', multiplier: 1.0, baseRevenue: 25000000 }, 'cold': { label: 'Cold Chain ❄️', multiplier: 1.8, baseRevenue: 65000000 }, 'danger': { label: 'Hazardous ☣️', multiplier: 2.5, baseRevenue: 85000000 }, 'express': { label: 'Express ⚡', multiplier: 1.5, baseRevenue: 45000000 } };
+        var fleetConfig = { 'QL-Bot': { v: 'diesel', c: 'general' }, 'Sarsa-Bot': { v: 'lng', c: 'general' }, 'MC-Bot': { v: 'diesel', c: 'danger' }, 'TD-Bot': { v: 'ev', c: 'express' }, 'Dyna-Bot': { v: 'hybrid', c: 'cold' } };
+        function initMap() { fetch('/get_cities').then(r => r.json()).then(cities => { rawCityData = cities; cityNamesList = Object.keys(cities); for (let k in cityMarkers) map.removeLayer(cityMarkers[k]); cityMarkers = {}; cityNamesList.forEach(n => { let f = document.getElementById('fromCity'), t = document.getElementById('toCity'); f.add(new Option(n, n)); t.add(new Option(n, n)); let color = '#3498db'; let radius = 5; if (n.includes('⚓')) { color = '#2c3e50'; radius = 8; } else if (n.includes('🏭') || n.includes('⚙️')) { color = '#c0392b'; radius = 7; } else if (n.includes('🏢')) { color = '#8e44ad'; radius = 6; } let marker = L.circleMarker(cities[n], { color: '#fff', weight: 1, fillColor: color, fillOpacity: 1, radius: radius }).addTo(map); marker.bindTooltip(n, { permanent: false, direction: 'top' }); cityMarkers[n] = marker; }); }); }
+        initMap();
+        function toggleHeatmap() { isHeatmapMode = !isHeatmapMode; let btn = document.getElementById('heatIcon'); if (isHeatmapMode) { btn.className = "bi bi-fire text-danger"; for (let agent in agentLayers) { map.removeLayer(agentLayers[agent]); } if (heatLayer) map.removeLayer(heatLayer); heatLayer = L.heatLayer(accumulatedPoints, { radius: 25, blur: 15, maxZoom: 10, gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' } }).addTo(map); } else { btn.className = "bi bi-fire"; if (heatLayer) map.removeLayer(heatLayer); lastRouteCache = {}; if (lastDataCache) updateVisuals(lastDataCache); } }
+        function toggleSidebar() { document.getElementById('sidebarContainer').classList.toggle('collapsed'); }
+        function toggleTheme() { let h = document.documentElement; h.setAttribute('data-bs-theme', h.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light'); document.getElementById('themeIcon').className = h.getAttribute('data-bs-theme') === 'light' ? 'bi bi-moon-stars-fill' : 'bi bi-sun-fill'; }
+        function setRankMode(mode) { rankMode = mode;['Profit', 'Cost', 'Green'].forEach(m => { let el = document.getElementById(`btnRank${m}`); if (el) el.className = (mode.toLowerCase() === m.toLowerCase()) ? 'btn btn-xs btn-outline-light active' : 'btn btn-xs btn-outline-light'; }); if (lastDataCache) updateVisuals(lastDataCache); }
+        var fleetModal = new bootstrap.Modal(document.getElementById('fleetModal'));
+        function openFleetConfig() { let tbody = document.getElementById('fleetTableBody'); tbody.innerHTML = ''; Object.keys(fleetConfig).forEach(agent => { let conf = fleetConfig[agent]; let vOpts = Object.keys(VEHICLES).map(k => `<option value="${k}" ${k === conf.v ? 'selected' : ''}>${VEHICLES[k].label}</option>`).join(''); let cOpts = Object.keys(CARGO).map(k => `<option value="${k}" ${k === conf.c ? 'selected' : ''}>${CARGO[k].label}</option>`).join(''); tbody.innerHTML += `<tr><td class="fw-bold text-primary">${agent}</td><td><select class="form-select form-select-sm" onchange="updateFleet('${agent}','v',this.value)">${vOpts}</select></td><td><select class="form-select form-select-sm" onchange="updateFleet('${agent}','c',this.value)">${cOpts}</select></td></tr>`; }); fleetModal.show(); }
+        function updateFleet(agent, type, val) { fleetConfig[agent][type] = val; if (lastDataCache) updateVisuals(lastDataCache); }
+
+        // V5.2.5: Toggle Training with Weather Polling and Spinner
+        function toggleTraining() {
+            isTraining = !isTraining;
+            let btn = document.getElementById('btnFastTrain');
+            let opsSpinner = document.getElementById('ops-spinner');
+
+            if (isTraining) {
+                btn.innerHTML = `<div class="spinner-border spinner-border-sm"></div> RUNNING`;
+                btn.className = "btn btn-danger fw-bold shadow-sm py-2";
+                if (opsSpinner) opsSpinner.classList.remove('d-none');
+                if (typeof startWeatherPolling === 'function') startWeatherPolling();
+                trainStep();
+            } else {
+                btn.innerHTML = `<i class="bi bi-play-circle-fill"></i> RESUME`;
+                btn.className = "btn btn-primary fw-bold shadow-sm py-2";
+                if (opsSpinner) opsSpinner.classList.add('d-none');
+                if (typeof stopWeatherPolling === 'function') stopWeatherPolling();
+            }
+        }
+
+        function trainStep() {
+            if (!isTraining) return;
+            fetch('/api/train').then(r => r.json()).then(data => {
+                lastDataCache = data;
+                let ep = data.routes[0] ? data.routes[0].episode : 0;
+                if (isTraining) document.getElementById('btnFastTrain').innerHTML = `<div class="spinner-border spinner-border-sm"></div> RUNNING (EP: ${ep})`;
+                updateVisuals(data);
+                if (isTraining) setTimeout(trainStep, 250);
+            }).catch(err => {
+                console.error("Train Step Error:", err);
+                if (isTraining) setTimeout(trainStep, 2000); // Retry after 2s
+            });
+        }
+
+        function updateVisuals(data) {
+            let statsHtml = ""; let rankData = [];
+
+            // V5.3: Update Reputation Score
+            if (data.reputation !== undefined) {
+                document.getElementById('reputationScore').textContent = data.reputation;
+            }
+
+            if (data.routes.length > 0 && data.routes[0].episode < 10) { accumulatedPoints = []; } else if (accumulatedPoints.length > 75000) { accumulatedPoints = accumulatedPoints.slice(-50000); }
+            if (data.routes) {
+                // Ensure disaster visuals are updated if data contains them (unlikely from train endpoint, but good safety)
+                if (data.disasters_expired !== undefined && typeof updateDisasterCount === 'function') updateDisasterCount();
+                data.routes.forEach(d => {
+                    if (visibleAgents[d.agent] === undefined) visibleAgents[d.agent] = true;
+                    if (!fleetConfig[d.agent]) fleetConfig[d.agent] = { v: 'diesel', c: 'general' };
+                    let conf = fleetConfig[d.agent]; let vSpec = VEHICLES[conf.v]; let cSpec = CARGO[conf.c];
+
+                    // V4.8 OPTION 3: TIERED EFFICIENCY PRICING
+                    let totalCost = d.distance * baseCostPerKm * cSpec.multiplier * vSpec.costMult;
+                    let efficiencyMultiplier = 1.0;
+                    if (d.distance < 300) efficiencyMultiplier = 1.25;      // Express bonus +25%
+                    else if (d.distance < 600) efficiencyMultiplier = 1.0;  // Standard rate
+                    else if (d.distance < 1000) efficiencyMultiplier = 0.90; // Long haul -10%
+                    else efficiencyMultiplier = 0.75;                        // Extreme -25%
+                    let revenue = cSpec.baseRevenue * efficiencyMultiplier;
+                    let netProfit = revenue - totalCost;
+
+                    let totalCO2 = d.distance * vSpec.co2;
+                    let brain = Math.round((1.0 - d.epsilon) * 100); if (brain < 0) brain = 0;
+
+                    // V5.3: Humanitarian Badge logic
+                    let badgeHtml = "";
+                    if (conf.c === 'humanitarian') {
+                        badgeHtml = `<span class="badge bg-danger ms-1" style="font-size:8px;"><i class="bi bi-heart-fill"></i> KARMA +100</span>`;
+                    }
+
+                    rankData.push({ agent: d.agent, dist: d.distance, co2: totalCO2, cost: totalCost, profit: netProfit, color: d.color, badge: badgeHtml });
+                    let isHidden = !visibleAgents[d.agent];
+                    let profitClass = netProfit >= 0 ? "text-profit" : "text-loss";
+                    let profitSign = netProfit >= 0 ? "+" : "";
+
+                    let co2Class = totalCO2 === 0 ? 'text-success fw-bold' : 'text-muted';
+                    statsHtml += `<div class="agent-card ${isHidden ? 'hidden-agent' : ''}" style="border-left-color:${d.color}" onclick="toggleAgent('${d.agent}')"><div class="d-flex justify-content-between mb-1"><span style="color:${d.color}; font-weight:bold;">${d.agent}</span><div><i class="bi bi-question-circle text-muted me-1" onclick="event.stopPropagation(); showExplanation('${d.agent}');" style="cursor:pointer;" title="Why this route?"></i><span class="badge bg-light text-dark border"><i class="bi ${vSpec.icon}"></i> ${conf.v.toUpperCase()}</span></div></div><div class="d-flex justify-content-between text-muted mb-1" style="font-size:10px;"><span>${cSpec.label}</span> <span>🏁 ${d.distance} KM</span></div><div class="d-flex justify-content-between bg-light p-1 rounded mb-1" style="font-size:10px;"><span class="text-muted">Cost: ${(totalCost / 1000000).toFixed(1)}Jt</span><span class="${profitClass}">P/L: ${profitSign}${(netProfit / 1000000).toFixed(1)} Jt</span></div><div class="d-flex justify-content-between text-muted mb-1" style="font-size:9px;"><span>💨 CO2: <span class="${co2Class}">${Math.round(totalCO2)} Kg</span></span><span>🧠 Brain: ${brain}%</span></div><div class="progress" style="height:3px;"><div class="progress-bar" style="width:${brain}%; background:${d.color}"></div></div></div>`;
+                    if (!isHidden) { let routeKey = d.path.join("-"); if (lastRouteCache[d.agent] !== routeKey) { lastRouteCache[d.agent] = routeKey; fetchAndDrawRoute(d.agent, d.path, d.color); } } else if (agentLayers[d.agent]) { map.removeLayer(agentLayers[d.agent]); delete lastRouteCache[d.agent]; }
+                });
+            }
+            document.getElementById('agentStats').innerHTML = statsHtml;
+            let sortedRank = [];
+            if (rankMode === 'dist') sortedRank = rankData.sort((a, b) => a.dist - b.dist);
+            else if (rankMode === 'green') sortedRank = rankData.sort((a, b) => a.co2 - b.co2);
+            else if (rankMode === 'cost') sortedRank = rankData.sort((a, b) => a.cost - b.cost);
+            else if (rankMode === 'profit') sortedRank = rankData.sort((a, b) => b.profit - a.profit);
+            let hofHtml = ""; sortedRank.forEach((e, index) => { let valDisplay = ""; if (rankMode === 'profit') valDisplay = `Rp ${(e.profit / 1000000).toFixed(1)} Jt`; else if (rankMode === 'cost') valDisplay = `Rp ${(e.cost / 1000000).toFixed(1)} Jt`; else if (rankMode === 'green') valDisplay = `${Math.round(e.co2)} Kg`; else valDisplay = `${e.dist} KM`; let rankColor = index === 0 ? "text-success" : ""; hofHtml += `<li class="list-group-item d-flex justify-content-between py-1"><span>#${index + 1} <b style="color:${e.color}">${e.agent}</b></span><span class="small fw-bold ${rankColor}">${valDisplay}</span></li>`; });
+            document.getElementById('hallOfFameList').innerHTML = hofHtml;
+        }
+        function applyScenario(type) { const find = (kw) => cityNamesList.find(n => n.toLowerCase().includes(kw.toLowerCase())); if (type === 'normal') { sabotageRoad('open', find('Cirebon'), find('Tegal')); alert("Restoring..."); } else if (type === 'pantura') { if (confirm("Block Pantura?")) sabotageRoad('blocked', find('Cirebon'), find('Tegal')); } }
+        function sabotageRoad(status, f, t) { fetch('/api/sabotage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: f, to: t, status: status }) }); }
+        function fetchAndDrawRoute(agent, cities, color) { if (!cities || cities.length < 2) return; let coords = cities.map(n => { let m = cityMarkers[n].getLatLng(); return `${m.lng},${m.lat}`; }).join(';'); fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`).then(r => r.json()).then(json => { if (!json.routes || json.routes.length === 0) return; if (isHeatmapMode) { let points = json.routes[0].geometry.coordinates.map(p => [p[1], p[0], 0.5]); accumulatedPoints.push(...points); if (heatLayer) map.removeLayer(heatLayer); heatLayer = L.heatLayer(accumulatedPoints, { radius: 25, blur: 15, gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' } }).addTo(map); return; } if (agentLayers[agent]) map.removeLayer(agentLayers[agent]); let w = 4; if (agent.includes('QL')) w = 6; agentLayers[agent] = L.geoJSON(json.routes[0].geometry, { style: { color: color, weight: w, opacity: 0.7 } }).addTo(map); }).catch(() => { }); }
+        function toggleAgent(name) { visibleAgents[name] = !visibleAgents[name]; if (lastDataCache) updateVisuals(lastDataCache); }
+        function resetSim() {
+            clearDisasters();  // V5.0: Clear disasters on reset
+            fetch('/api/reset').then(() => location.reload());
+        }
+
+        // --- V5.0: DISASTER MANAGEMENT FUNCTIONS ---
+
+        // Map click event handler for disaster placement
+        map.on('click', function (e) {
+            if (!isDisasterMode) return; // Guard: Only allow in chaos mode
+
+            // P0 Fix #3: Debounce rapid clicks (500ms cooldown)
+            if (clickDebounceTimer) return;
+            clickDebounceTimer = setTimeout(() => { clickDebounceTimer = null; }, 500);
+
+            let severity = parseInt(document.querySelector('input[name="disasterSeverity"]:checked').value);  // V5.1
+            let radius = parseInt(document.getElementById('disasterRadius').value);
+            let lat = e.latlng.lat;
+            let lon = e.latlng.lng;
+
+            // Visual feedback while processing
+            let statusEl = document.getElementById('disasterStatus');
+            statusEl.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Creating...';
+
+            // V5.1: API call with severity parameter
+            fetch('/api/disaster', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lon, type: 'flood', severity, radius })  // V5.1: severity is key
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        let disaster = data.disaster;
+
+                        // V5.1.3: Draw circle on map with improved visibility
+                        let circle = L.circle([lat, lon], {
+                            color: disaster.color,
+                            fillColor: disaster.color,
+                            fillOpacity: 0.4,        // V5.1.3: Increased from 0.25
+                            radius: radius * 1000,   // Convert km to meters
+                            weight: 1,               // V5.1.3: Reduced from 2
+                            opacity: 0.6             // V5.1.3: Border transparency
+                        }).addTo(map);
+
+                        circle.bindPopup(`<b>${disaster.icon} ${disaster.severity_name}</b><br>Radius: ${radius} km<br>Penalty: ${disaster.multiplier}x`);  // V5.1
+
+                        // P0 Fix #8: Track for memory management
+                        disasterCircles.push(circle);
+
+                        // V5.2: Register disaster in map for polling updates
+                        disasterCircleMap[disaster.id] = circle;
+
+                        updateDisasterCount();
+                        statusEl.innerHTML = '<i class="bi bi-check-circle text-success"></i> ' + data.message;
+
+                        setTimeout(() => {
+                            statusEl.innerHTML = '<i class="bi bi-crosshair"></i> Click map to spawn disaster';
+                        }, 2000);
+                    } else {
+                        statusEl.innerHTML = '<i class="bi bi-exclamation-circle text-danger"></i> ' + data.message;
+                    }
+                })
+                .catch(err => {
+                    statusEl.innerHTML = '<i class="bi bi-x-circle text-danger"></i> Failed: ' + err;
+                });
+        });
+
+        // V5.0: Update disaster count display
+        function updateDisasterCount() {
+            fetch('/api/disasters')
+                .then(r => r.json())
+                .then(data => {
+                    let count = data.count || 0;
+                    document.getElementById('disasterCount').textContent = count;
+
+                    // V5.2.5: Update CHAOS tab badge
+                    let badge = document.getElementById('chaos-badge');
+                    if (count > 0) {
+                        badge.textContent = count;
+                        badge.classList.remove('d-none');
+                    } else {
+                        badge.classList.add('d-none');
+                    }
+                });
+        }
+
+        function clearDisasters() {
+            fetch('/api/disaster', { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    // P0 Fix #8: Remove all circles from map (prevent memory leak)
+                    disasterCircles.forEach(circle => map.removeLayer(circle));
+                    disasterCircles = [];  // Clear array
+
+                    updateDisasterCount();
+
+                    document.getElementById('disasterStatus').innerHTML =
+                        '<i class="bi bi-check-circle text-success"></i> ' + data.message;
+
+                    setTimeout(() => {
+                        document.getElementById('disasterStatus').innerHTML =
+                            '<i class="bi bi-crosshair"></i> Click map to spawn disaster';
+                    }, 2000);
+                });
+        }
+
+        // Initialize disaster counter on page load
+        setTimeout(updateDisasterCount, 1000);
+
+        // V5.2: Weather System - Real-time Disaster Updates
+        function startWeatherPolling() {
+            console.log(">>> Starting weather polling...");
+            weatherPollInterval = setInterval(() => {
+                fetch('/api/disasters')
+                    .then(r => r.json())
+                    .then(data => {
+                        updateDisasterVisuals(data.disasters);
+                    })
+                    .catch(err => console.error("Weather poll error:", err));
+            }, 2000);  // Poll every 2 seconds during training
+        }
+
+        function stopWeatherPolling() {
+            if (weatherPollInterval) {
+                clearInterval(weatherPollInterval);
+                weatherPollInterval = null;
+                console.log(">>> Weather polling stopped");
+            }
+        }
+
+        function updateDisasterVisuals(disasters) {
+            // Track which disasters still exist
+            let activeIds = new Set(disasters.map(d => d.id));
+
+            // Update existing disasters
+            disasters.forEach(disaster => {
+                let circle = disasterCircleMap[disaster.id];
+
+                if (circle) {
+                    // V5.2: Animate position and size changes
+                    let newLatLng = L.latLng(disaster.lat, disaster.lon);
+                    let currentLatLng = circle.getLatLng();
+
+                    // Only update if moved (avoid flickering)
+                    if (currentLatLng.lat !== disaster.lat || currentLatLng.lon !== disaster.lon) {
+                        circle.setLatLng(newLatLng);
+                    }
+
+                    // Only update radius if changed
+                    let newRadius = disaster.radius * 1000;  // km to meters
+                    if (Math.abs(circle.getRadius() - newRadius) > 10) {  // 10m threshold
+                        circle.setRadius(newRadius);
+                    }
+
+                    // Update popup with lifecycle info
+                    circle.setPopupContent(`
+                        <b>${disaster.icon} ${disaster.severity_name}</b><br>
+                        Age: ${disaster.age || 0} episodes<br>
+                        Radius: ${disaster.radius.toFixed(1)} km<br>
+                        ${disaster.is_moving ? '→ Moving ' + (disaster.velocity[0] > 0 ? 'East' : 'West') : ''}
+                        ${disaster.is_decaying ? '↓ Receding' : ''}
+                    `);
+                } else {
+                    // V5.2: New disaster, add to map
+                    let newCircle = L.circle([disaster.lat, disaster.lon], {
+                        color: disaster.color,
+                        fillColor: disaster.color,
+                        fillOpacity: 0.4,
+                        radius: disaster.radius * 1000,
+                        weight: 1,
+                        opacity: 0.6
+                    }).addTo(map);
+                    newCircle.bindPopup(`<b>${disaster.icon} ${disaster.severity_name}</b><br>Radius: ${disaster.radius.toFixed(1)} km<br>Penalty: ${disaster.multiplier}x`);
+                    disasterCircleMap[disaster.id] = newCircle;
+                    console.log(`>>> New disaster ${disaster.id} added to map`);
+                }
+            });
+
+            // Remove expired disasters
+            Object.keys(disasterCircleMap).forEach(id => {
+                if (!activeIds.has(parseInt(id))) {
+                    let circle = disasterCircleMap[id];
+                    map.removeLayer(circle);
+                    delete disasterCircleMap[id];
+                    console.log(`>>> Disaster ${id} expired (removed from map)`);
+                }
+            });
+        }
+
+        // --- V4.9 BRAIN PERSISTENCE FUNCTIONS ---
+        function saveBrain() {
+            fetch('/api/save_brain').then(r => r.json()).then(data => {
+                let jsonStr = JSON.stringify(data, null, 2);
+                let blob = new Blob([jsonStr], { type: "application/json" });
+                let url = URL.createObjectURL(blob);
+                let a = document.createElement('a');
+                a.href = url;
+                a.download = `logistics_brain_ep${data.episodes}_v${data.version}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                alert(`Brain saved! Episode ${data.episodes}, ${data.num_cities} cities`);
+            }).catch(err => alert('Save failed: ' + err));
+        }
+
+        function loadBrain(input) {
+            let file = input.files[0];
+            if (!file) return;
+
+            // VALIDATION: File size limit (50MB)
+            const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
+            if (file.size > MAX_SIZE) {
+                alert(`File too large! (${(file.size / 1024 / 1024).toFixed(1)}MB, max 50MB)`);
+                input.value = ''; // Reset input
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    let data = JSON.parse(e.target.result);
+
+                    // Show loading indicator
+                    let btn = document.getElementById('btnFastTrain');
+                    btn.innerHTML = '<div class="spinner-border spinner-border-sm"></div> LOADING BRAIN...';
+                    btn.disabled = true;
+
+                    fetch('/api/load_brain', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    }).then(r => r.json()).then(res => {
+                        if (res.msg) {
+                            alert(res.msg);
+                            if (res.msg.includes('successfully')) {
+                                // Update badge to show loaded brain
+                                let badge = document.getElementById('dataSourceBadge');
+                                if (badge && data.episodes) {
+                                    badge.className = 'badge bg-info stats-font';
+                                    badge.innerHTML = `🧠 LOADED (EP ${data.episodes})`;
+                                }
+                                setTimeout(() => location.reload(), 1500); // Delay reload for user to see badge
+                            }
+                        }
+                        btn.disabled = false;
+                    }).catch(err => {
+                        alert('Load failed: ' + err);
+                        btn.disabled = false;
+                    });
+                } catch (err) {
+                    alert('Invalid JSON file: ' + err);
+                }
+            };
+            reader.onerror = function () { alert('File read failed!'); };
+            reader.readAsText(file);
+            input.value = ''; // Reset input for re-upload
+        }
+
+        // V5.0.1: Disaster Visualization System (Part A + B)
+        var disasterLayers = {};
+
+        function renderDisasters(disasters) {
+            // Clear existing disaster overlays
+            for (let id in disasterLayers) {
+                map.removeLayer(disasterLayers[id]);
+            }
+            disasterLayers = {};
+
+            // Update counter
+            document.getElementById('disasterCount').innerText = disasters.length;
+
+            // Draw new disaster circles
+            disasters.forEach(d => {
+                // Color by severity
+                let color = '#ffeb3b'; // L1 yellow
+                if (d.severity === 2) color = '#ff9800'; // L2 orange
+                if (d.severity === 3) color = '#f44336'; // L3 red
+
+                // Create circle overlay (radius in meters)
+                let circle = L.circle([d.lat, d.lon], {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.2,
+                    radius: d.radius * 1000,
+                    weight: 2,
+                    zIndex: 1 // Below routes
+                }).addTo(map);
+
+                // Add popup with disaster info
+                circle.bindPopup(`
+                    <b>${d.severity_name || 'Disaster'} ${(d.type || 'unknown').toUpperCase()}</b><br>
+                    Radius: ${d.radius} km<br>
+                    Multiplier: ${d.multiplier}x<br>
+                    ID: ${d.id}
+                `);
+
+                disasterLayers[d.id] = circle;
+            });
+        }
+
+        function fetchDisasters() {
+            fetch('/api/disasters')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.disasters) {
+                        renderDisasters(data.disasters);
+                    }
+                })
+                .catch(err => console.error('Disaster fetch failed:', err));
+        }
+
+
+
+        // Auto-refresh disasters every 10 seconds
+        setInterval(fetchDisasters, 10000);
+
+        // Initial load for disaster mode (longer delay to avoid race condition)
+        setTimeout(fetchDisasters, 3000); // 3s instead of 1s - fixes SyntaxError
+
+        // --- P0:  INTERPRETABILITY & WHAT-IF FEATURES ---
+
+        // P0.1: Decision Explanation
+        function showExplanation(agentName) {
+            fetch(`/api/explain/${agentName}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'exploring') {
+                        alert(`${agentName} is still exploring (ε=${data.epsilon})\n\nInsufficient training data for explanation.`);
+                        return;
+                    }
+
+                    let message = `${agentName} Decision Analysis\n\n`;
+                    message += `📊 Training Progress: ${data.total_states_explored} states explored\n`;
+                    message += `🧠 Exploration Rate: ${(data.current_epsilon * 100).toFixed(1)}%\n\n`;
+                    message += `Top 3 Route Choices:\n`;
+
+                    data.top_routes.forEach((route, i) => {
+                        message += `${i + 1}. ${route.city_name}\n`;
+                        message += `   Q-Value: ${route.q_value} (${route.percentage}%)\n`;
+                    });
+
+                    message += `\nDecision Factors:\n`;
+                    data.decision_factors.forEach(f => {
+                        message += `• ${f.factor}: ${f.weight}%\n`;
+                    });
+
+                    alert(message);
+                })
+                .catch(err => alert('Error: ' + err));
+        }
+
+        // P0.2: Disaster Impact Calculator (Preview Mode)
+        let impactPreviewMode = false;
+        let previewCircle = null;
+
+        function toggleImpactPreview() {
+            impactPreviewMode = !impactPreviewMode;
+            let btn = document.getElementById('btnImpactPreview');
+            if (impactPreviewMode) {
+                btn.className = 'btn btn-sm btn-warning w-100 fw-bold';
+                btn.innerHTML = '👁️ Preview Mode: ON (hover map)';
+                alert('Impact Preview Mode ON\n\nHover mouse over map to see disaster impact prediction.');
+            } else {
+                btn.className = 'btn btn-sm btn-outline-secondary w-100';
+                btn.innerHTML = '📊 Enable Impact Preview';
+                if (previewCircle) map.removeLayer(previewCircle);
+            }
+        }
+
+        // Debounced impact calculation
+        let impactDebounceTimer = null;
+        map.on('mousemove', function (e) {
+            if (!impactPreviewMode) return;
+
+            // Show ghost circle
+            if (previewCircle) map.removeLayer(previewCircle);
+            let radius = parseInt(document.getElementById('disasterRadius').value);
+            previewCircle = L.circle([e.latlng.lat, e.latlng.lng], {
+                color: '#ffc107',
+                fillColor: '#ffc107',
+                fillOpacity: 0.15,
+                radius: radius * 1000,
+                weight: 1,
+                dashArray: '5, 5'
+            }).addTo(map);
+
+            // Debounce calculation
+            clearTimeout(impactDebounceTimer);
+            impactDebounceTimer = setTimeout(() => {
+                calculateImpactPreview(e.latlng.lat, e.latlng.lng);
+            }, 300);
+        });
+
+        function calculateImpactPreview(lat, lon) {
+            let severity = parseInt(document.querySelector('input[name="disasterSeverity"]:checked').value);
+            let radius = parseInt(document.getElementById('disasterRadius').value);
+
+            fetch('/api/disaster_impact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lon, severity, radius })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    let panel = document.getElementById('impactPreviewPanel');
+                    if (!panel) return;
+
+                    let html = `<div class="small">\n`;
+                    html += `<b>${data.disaster_preview.icon} ${data.disaster_preview.severity_name}</b><br>\n`;
+                    html += `📍 Affected Cities: ${data.impact_summary.affected_cities_count}<br>\n`;
+                    html += `🚛 Routes Affected: ${data.impact_summary.routes_affected}<br>\n\n`;
+
+                    if (data.agent_impacts.length > 0) {
+                        html += `<b>Cost Impact:</b><br>\n`;
+                        data.agent_impacts.forEach(a => {
+                            html += `• ${a.agent}: +${(a.cost_increase / 1000000).toFixed(1)}Jt (+${a.cost_increase_pct}%)<br>\n`;
+                        });
+                    }
+
+                    html += `<br><i>${data.recommendation}</i>`;
+                    html += `</div>`;
+
+                    panel.innerHTML = html;
+                })
+                .catch(err => console.error('Impact calc failed:', err));
+        }
+
+        // P0.3: Agent Comparison Table
+        function showAgentComparison() {
+            fetch('/api/agent_comparison')
+                .then(r => r.json())
+                .then(data => {
+                    let modal = new bootstrap.Modal(document.getElementById('comparisonModal'));
+                    let tbody = document.getElementById('comparisonTableBody');
+
+                    tbody.innerHTML = '';
+                    data.comparison.forEach(agent => {
+                        let profitClass = agent.metrics.avg_profit >= 0 ? 'text-success' : 'text-danger';
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><b style="color:${agent.color}">${agent.agent}</b></td>
+                                <td class="${profitClass}">${(agent.metrics.avg_profit / 1000000).toFixed(1)} Jt</td>
+                                <td>${agent.metrics.avg_distance} km</td>
+                                <td>${agent.metrics.avg_co2} kg</td>
+                                <td>${agent.metrics.convergence}</td>
+                                <td>${agent.metrics.route_diversity}</td>
+                            </tr>
+                        `;
+                    });
+
+                    // Update winners
+                    document.getElementById('winnerProfit').textContent = data.winners.most_profitable;
+                    document.getElementById('winnerGreen').textContent = data.winners.most_green;
+                    document.getElementById('winnerCost').textContent = data.winners.lowest_cost;
+
+                    modal.show();
+                })
+                .catch(err => alert('Comparison failed: ' + err));
+        }
+
+        // V5.2.5: Tab State Logic
+        document.getElementById('chaos-tab').addEventListener('click', function () { isDisasterMode = true; });
+        document.getElementById('ops-tab').addEventListener('click', function () { isDisasterMode = false; });
+        document.getElementById('data-tab').addEventListener('click', function () { isDisasterMode = false; });
+    </script>
+</body>
+
+</html>
