@@ -67,3 +67,8 @@ def sample_distance_matrix():
         [20, 25, 30, 0, 15],
         [25, 30, 20, 15, 0]
     ]
+
+@pytest.fixture
+def agent_registry():
+    """Access the agents dictionary from the running app instance."""
+    return app_module.agents
