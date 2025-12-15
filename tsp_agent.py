@@ -6,7 +6,135 @@ import time
 import os
 from collections import defaultdict
 
-# --- PARENT CLASS: Menangani Fisika & Memori ---
+# === V5.7: Test Helper Functions (Module-Level) ===
+# These standalone functions are required by test suite
+
+def calculate_total_distance(route, distance_matrix):
+    """
+    Calculate total distance for a given route.
+    
+    Args:
+        route: List of city indices representing the route
+        distance_matrix: 2D array/matrix of distances
+    
+    Returns:
+        float: Total distance of the route
+    """
+    total = 0.0
+    for i in range(len(route) - 1):
+        from_city, to_city = route[i], route[i + 1]
+        total += distance_matrix[from_city][to_city]
+    return total
+
+
+def generate_random_route(num_cities):
+    """
+    Generate a random route visiting all cities exactly once.
+    
+    Args:
+        num_cities: Number of cities to visit
+    
+    Returns:
+        list: Random permutation of city indices
+    """
+    route = list(range(num_cities))
+    random.shuffle(route)
+    return route
+
+
+def solve_tsp_genetic(distance_matrix, population_size=20, generations=50):
+    """
+    Solve TSP using a simple genetic algorithm.
+    
+    Args:
+        distance_matrix: 2D array of distances
+        population_size: Number of routes in population
+        generations: Number of evolutionary generations
+    
+    Returns:
+        dict: {'best_route': list, 'best_distance': float}
+    """
+    num_cities = len(distance_matrix)
+    
+    # Initialize population with random routes
+    population = [generate_random_route(num_cities) for _ in range(population_size)]
+    
+    def fitness(route):
+        # Return negative distance (we want to minimize)
+        return -calculate_total_distance(route + [route[0]], distance_matrix)
+    
+    # Evolve population
+    for gen in range(generations):
+        # Sort by fitness (best first)
+        population.sort(key=fitness, reverse=True)
+        
+        # Keep top 50% (elitism)
+        survivors = population[:population_size // 2]
+        
+        # Create offspring
+        offspring = []
+        while len(offspring) < population_size - len(survivors):
+            # Simple crossover: take first half from parent1, rest from parent2
+            parent1, parent2 = random.sample(survivors, 2)
+            cutpoint = num_cities // 2
+            
+            child = parent1[:cutpoint]
+            for city in parent2:
+                if city not in child:
+                    child.append(city)
+            offspring.append(child)
+        
+        population = survivors + offspring
+    
+    # Return best solution
+    best_route = min(population, key=lambda r: calculate_total_distance(r + [r[0]], distance_matrix))
+    best_distance = calculate_total_distance(best_route + [best_route[0]], distance_matrix)
+    
+    return {
+        'best_route': best_route,
+        'best_distance': best_distance
+    }
+
+
+def create_distance_matrix(cities):
+    """
+    Create distance matrix from city coordinates using Haversine formula.
+    
+    Args:
+        cities: Dict mapping city_id -> {'lat': float, 'lon': float}
+    
+    Returns:
+        numpy.ndarray: Distance matrix (km)
+    """
+    num_cities = len(cities)
+    ids = sorted(cities.keys())
+    matrix = np.zeros((num_cities, num_cities), dtype=np.float32)
+    
+    for i in range(num_cities):
+        for j in range(num_cities):
+            if i == j:
+                continue
+            
+            city1 = cities[ids[i]]
+            city2 = cities[ids[j]]
+            
+            # Haversine formula
+            R = 6371  # Earth radius in km
+            lat1, lon1 = math.radians(city1['lat']), math.radians(city1['lon'])
+            lat2, lon2 = math.radians(city2['lat']), math.radians(city2['lon'])
+            
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            
+            a = (math.sin(dlat / 2) ** 2 +
+                 math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2)
+            c = 2 * math.asin(math.sqrt(a))
+            
+            matrix[i][j] = R * c
+    
+    return matrix
+
+
 class TSPBaseAgent:
     def __init__(self, cities, dist_matrix=None, alpha=0.1, gamma=0.99, epsilon=1.0, epsilon_decay=0.9995, **kwargs):
         self.cities = cities
