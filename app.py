@@ -282,7 +282,7 @@ def health_check():
     """
     return jsonify({
         "status": "healthy",
-        "version": "V5.8.0",
+        "version": "V5.8.1",
         "agents": len(agents),
         "cities": len(cities_data),
         "disasters": len(active_disasters),
