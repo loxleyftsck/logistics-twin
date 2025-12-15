@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [V5.7.0] - 2025-12-15
+
+### Added - Testing Infrastructure
+- **Module-Level Test Helpers:** 4 new utility functions
+  - `calculate_total_distance()` - Route distance calculation
+  - `generate_random_route()` - Random route permutation
+  - `solve_tsp_genetic()` - Basic genetic algorithm TSP solver
+  - `create_distance_matrix()` - Haversine-based distance matrix
+
+### Fixed - Test Suite
+- Fixed `sample_cities` fixture format (dict with 'lon' key)
+- All previously skipped tests now passing
+- Test compatibility improved for module-level functions
+
+### Testing
+- **Tests Status:** 12 passed, 0 skipped (was 8 passed, 4 skipped)
+- **Coverage:** Helper functions added to tsp_agent module
+- **Quality:** 100% test pass rate maintained
+
+### Development
+- Git branching strategy implemented
+- Feature branch workflow established
+- Safe rollback points via tagged releases
+
+---
+
 ## [V5.6.1] - 2025-12-15
 
 ### Changed - Project Reorganization
