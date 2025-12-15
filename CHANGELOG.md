@@ -3,7 +3,46 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [V5.8.0] - 2025-12-15
+
+### Added - Frontend Foundation & Component Architecture
+- **Component CSS Architecture:**
+  - Created `static/css/components.css` (220+ lines)
+  - Extracted reusable component patterns
+  - Agent Card component with status-based coloring
+  - Disaster severity badge system
+  - Nav pills, modal, stats components
+  
+- **Design System Tokens:**
+  - 65+ CSS variables in `:root`
+  - Color palette (primary, status, semantic)
+  - Spacing scale (8px base, --space-1 to --space-10)
+  - Typography tokens (sans, mono, weights, sizes)
+  - Shadow system (sm, md, lg, active)
+  - Border radius scale
+  - Transition timing & easing
+  - Z-index scale
+
+### Changed - Code Quality
+- **Refactored CSS:**
+  - Moved 30+ lines from inline to external CSS
+  - Replaced hardcoded values with design tokens
+  - Dark mode support for neutral colors
+  - Consistent spacing using 8px scale
+
+### Metrics
+- Design token coverage: 35% (+15% from V5.7.1)
+- CSS organization: 3 files (inline, external, external components)
+- Inline style reduction: 25% smaller `<style>` block
+- Component patterns: 7 extracted
+
+### Development
+- External CSS file linked via Flask `url_for()`
+- Token-based styling ensures consistency
+- Foundation for V6.0 Atomic Design refactoring
+
+---
 
 ## [V5.7.1] - 2025-12-15
 

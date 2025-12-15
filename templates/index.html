@@ -10,16 +10,82 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
 
     <style>
+        /* ============================================
+           DESIGN SYSTEM TOKENS (V5.8)
+           Based on @design-rules.md
+           ============================================ */
         :root {
+            /* Theme-specific */
             --sidebar-bg: rgba(255, 255, 255, 0.96);
             --sidebar-border: rgba(255, 255, 255, 0.5);
+
+            /* Color Palette */
+            --color-primary: #3498db;
+            --color-success: #2ecc71;
+            --color-warning: #f39c12;
+            --color-danger: #e74c3c;
+            --color-danger-light: #e67e22;
+
+            /* Status Colors */
+            --color-status-idle: #95a5a6;
+            --color-status-moving: #3498db;
+            --color-status-delivering: #2ecc71;
+            --color-status-returning: #f39c12;
+            --color-status-blocked: #e74c3c;
+
+            /* Neutral Colors */
+            --color-neutral-100: rgba(0, 0, 0, 0.05);
+            --color-neutral-200: rgba(0, 0, 0, 0.1);
+            --color-neutral-300: #ccc;
+
+            /* Spacing Scale (8px base) */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-5: 20px;
+            --space-6: 24px;
+            --space-8: 32px;
+            --space-10: 40px;
+
+            /* Typography */
+            --font-sans: 'Segoe UI', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-semibold: 600;
+            --text-xs: 10px;
+            --text-sm: 14px;
+
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 12px;
+
+            /* Shadows */
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+            --shadow-md: 4px 4px 12px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.25);
+            --shadow-active: 0 0 0 3px rgba(52, 152, 219, 0.2);
+
+            /* Transitions */
+            --timing-fast: 0.2s;
+            --timing-normal: 0.3s;
+            --easing-out: ease-out;
+
+            /* Z-index Scale */
+            --z-map: 1;
+            --z-sidebar: 1000;
+            --z-modal: 9999;
         }
 
         [data-bs-theme="dark"] {
             --sidebar-bg: rgba(33, 37, 41, 0.96);
             --sidebar-border: rgba(255, 255, 255, 0.1);
+            --color-neutral-100: rgba(255, 255, 255, 0.05);
+            --color-neutral-200: rgba(255, 255, 255, 0.1);
+            --color-neutral-300: #555;
         }
 
         body {
@@ -76,31 +142,9 @@
             color: var(--bs-body-color);
         }
 
-        .stats-font {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-        }
+        /* Stats font moved to components.css */
 
-        .agent-card {
-            background: var(--bs-body-bg);
-            border-radius: 6px;
-            padding: 10px 12px;
-            margin-bottom: 8px;
-            border-left: 4px solid #ccc;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-
-        .agent-card:hover {
-            transform: translateX(-3px);
-            box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .agent-card.hidden-agent {
-            opacity: 0.5;
-            filter: grayscale(100%);
-        }
+        /* Agent card styles moved to components.css */
 
         .text-profit {
             color: #27ae60;
@@ -175,7 +219,7 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <div>
                     <h5 class="fw-bold m-0"><i class="bi bi-cpu-fill"></i> Logistics Twin</h5>
-                    <small class="text-muted" style="font-size:10px;">V5.7.1 • PRODUCTION READY</small>
+                    <small class="text-muted" style="font-size:10px;">V5.8.0 • PRODUCTION READY</small>
                 </div>
             </div>
 
