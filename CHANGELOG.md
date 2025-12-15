@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [V5.7.1] - 2025-12-15
+
+### Added - CI/CD & Design System
+- **GitHub Actions CI/CD:**
+  - Automated testing on push to main/feature branches
+  - Code quality checks with flake8
+  - Security vulnerability scanning with safety
+  - Docker build workflow on version tags
+  
+- **Design System Documentation:**
+  - `@design-rules.md` with 16 comprehensive sections
+  - Color palette (agents, status, semantic colors)
+  - 8px spacing scale, typography system
+  - Component patterns & anti-patterns guide
+  - Migration guide for V6.0 refactoring
+
+### Development
+- Feature branch workflow fully operational
+- Automated CI pipeline running on commits
+- Code quality gates established
+- Documentation-first approach implemented
+
+### Metrics
+- GitHub Actions: 3 workflows (CI, Docker, future: Deploy)
+- Design token coverage: 20% baseline documented
+- Code quality: Flake8 + safety checks active
+
+---
+
 ## [V5.7.0] - 2025-12-15
 
 ### Added - Testing Infrastructure
