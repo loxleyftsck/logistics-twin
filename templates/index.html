@@ -248,6 +248,12 @@
                         <i class="bi bi-bar-chart-fill"></i> <small>DATA</small>
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="teach-tab" data-bs-toggle="pill" data-bs-target="#tab-teach"
+                        type="button" role="tab">
+                        <i class="bi bi-mortarboard-fill"></i> <small>TEACH</small>
+                    </button>
+                </li>
             </ul>
 
             <!-- V5.2.5: Tab Content -->
@@ -448,6 +454,65 @@
                     </div>
                 </div>
 
+                <!-- TEACH TAB (V5.9) -->
+                <div class="tab-pane fade" id="tab-teach" role="tabpanel">
+                    <div class="card mb-2 border-0 shadow-sm bg-primary-subtle">
+                        <div class="card-header bg-primary text-white py-1 fw-bold small">
+                            <i class="bi bi-mortarboard-fill"></i> INTERVENTION LEARNING
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="teachModeToggle"
+                                    onchange="toggleTeachingMode()">
+                                <label class="form-check-label small fw-bold" for="teachModeToggle">Enable Teaching
+                                    Mode</label>
+                            </div>
+
+                            <div id="teachingControls" class="d-none">
+                                <small class="text-muted d-block mb-1">Select Agent to Teach:</small>
+                                <select id="teachAgentSelect" class="form-select form-select-sm mb-2">
+                                    <option value="QL-Bot">QL-Bot</option>
+                                    <option value="Sarsa-Bot">Sarsa-Bot</option>
+                                    <option value="MC-Bot">MC-Bot</option>
+                                    <option value="TD-Bot">TD-Bot</option>
+                                    <option value="Dyna-Bot">Dyna-Bot</option>
+                                </select>
+
+                                <div class="card mb-2">
+                                    <div class="card-body p-2 bg-light text-center small">
+                                        <i class="bi bi-cursor-fill text-primary"></i> Click cities on map to build a
+                                        route
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="fw-bold">Lesson Route:</small>
+                                    <span class="badge bg-secondary" id="lessonStepCount">0 steps</span>
+                                </div>
+
+                                <ul id="lessonRouteList" class="list-group list-group-flush small mb-2 border rounded"
+                                    style="max-height:150px;overflow-y:auto; font-size:10px;">
+                                    <li class="list-group-item text-muted text-center py-1">- Empty -</li>
+                                </ul>
+
+                                <div class="d-grid gap-1">
+                                    <button class="btn btn-sm btn-success fw-bold" onclick="submitLesson()"
+                                        id="btnSubmitLesson" disabled>
+                                        <i class="bi bi-check-lg"></i> TEACH AGENT
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="clearLesson()">
+                                        <i class="bi bi-x-lg"></i> Clear Route
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="teachInstructions" class="small text-muted text-center mt-2">
+                                Toggle "Enable" to start demonstrating routes manually.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- Hidden select elements -->
@@ -536,7 +601,47 @@
         const VEHICLES = { 'diesel': { label: 'Diesel Heavy', co2: 2.6, costMult: 1.0, icon: 'bi-truck' }, 'hybrid': { label: 'Hybrid Wingbox', co2: 1.8, costMult: 1.2, icon: 'bi-battery-half' }, 'ev': { label: 'Electric Semi', co2: 0.0, costMult: 1.6, icon: 'bi-lightning-charge' }, 'lng': { label: 'LNG Truck', co2: 1.2, costMult: 1.1, icon: 'bi-droplet' } };
         const CARGO = { 'general': { label: 'General Goods 📦', multiplier: 1.0, baseRevenue: 25000000 }, 'cold': { label: 'Cold Chain ❄️', multiplier: 1.8, baseRevenue: 65000000 }, 'danger': { label: 'Hazardous ☣️', multiplier: 2.5, baseRevenue: 85000000 }, 'express': { label: 'Express ⚡', multiplier: 1.5, baseRevenue: 45000000 } };
         var fleetConfig = { 'QL-Bot': { v: 'diesel', c: 'general' }, 'Sarsa-Bot': { v: 'lng', c: 'general' }, 'MC-Bot': { v: 'diesel', c: 'danger' }, 'TD-Bot': { v: 'ev', c: 'express' }, 'Dyna-Bot': { v: 'hybrid', c: 'cold' } };
-        function initMap() { fetch('/get_cities').then(r => r.json()).then(cities => { rawCityData = cities; cityNamesList = Object.keys(cities); for (let k in cityMarkers) map.removeLayer(cityMarkers[k]); cityMarkers = {}; cityNamesList.forEach(n => { let f = document.getElementById('fromCity'), t = document.getElementById('toCity'); f.add(new Option(n, n)); t.add(new Option(n, n)); let color = '#3498db'; let radius = 5; if (n.includes('⚓')) { color = '#2c3e50'; radius = 8; } else if (n.includes('🏭') || n.includes('⚙️')) { color = '#c0392b'; radius = 7; } else if (n.includes('🏢')) { color = '#8e44ad'; radius = 6; } let marker = L.circleMarker(cities[n], { color: '#fff', weight: 1, fillColor: color, fillOpacity: 1, radius: radius }).addTo(map); marker.bindTooltip(n, { permanent: false, direction: 'top' }); cityMarkers[n] = marker; }); }); }
+        function initMap() {
+            fetch('/get_cities').then(r => r.json()).then(cities => {
+                rawCityData = cities;
+                cityNamesList = Object.keys(cities);
+                for (let k in cityMarkers) map.removeLayer(cityMarkers[k]);
+                cityMarkers = {};
+
+                cityNamesList.forEach(n => {
+                    let f = document.getElementById('fromCity');
+                    let t = document.getElementById('toCity');
+                    f.add(new Option(n, n));
+                    t.add(new Option(n, n));
+
+                    let color = '#3498db';
+                    let radius = 5;
+                    if (n.includes('⚓')) { color = '#2c3e50'; radius = 8; }
+                    else if (n.includes('🏭') || n.includes('⚙️')) { color = '#c0392b'; radius = 7; }
+                    else if (n.includes('🏢')) { color = '#8e44ad'; radius = 6; }
+
+                    let marker = L.circleMarker(cities[n], {
+                        color: '#fff',
+                        weight: 1,
+                        fillColor: color,
+                        fillOpacity: 1,
+                        radius: radius
+                    }).addTo(map);
+
+                    marker.bindTooltip(n, { permanent: false, direction: 'top' });
+
+                    // V5.9: Click handler for Teaching Mode
+                    marker.on('click', function (e) {
+                        L.DomEvent.stopPropagation(e); // Prevent map click (disaster spawn)
+                        if (typeof handleCityClick === 'function') {
+                            handleCityClick(n);
+                        }
+                    });
+
+                    cityMarkers[n] = marker;
+                });
+            });
+        }
         initMap();
         function toggleHeatmap() { isHeatmapMode = !isHeatmapMode; let btn = document.getElementById('heatIcon'); if (isHeatmapMode) { btn.className = "bi bi-fire text-danger"; for (let agent in agentLayers) { map.removeLayer(agentLayers[agent]); } if (heatLayer) map.removeLayer(heatLayer); heatLayer = L.heatLayer(accumulatedPoints, { radius: 25, blur: 15, maxZoom: 10, gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' } }).addTo(map); } else { btn.className = "bi bi-fire"; if (heatLayer) map.removeLayer(heatLayer); lastRouteCache = {}; if (lastDataCache) updateVisuals(lastDataCache); } }
         function toggleSidebar() { document.getElementById('sidebarContainer').classList.toggle('collapsed'); }
@@ -1106,7 +1211,29 @@
         document.getElementById('ops-tab').addEventListener('click', function () { isDisasterMode = false; });
         document.getElementById('data-tab').addEventListener('click', function () { isDisasterMode = false; });
 
-        // V5.8.1: Map Editor Functions
+        // V5.9: Toast Functionality
+        function showToast(message, type = 'success') {
+            const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
+            const toastHTML = `
+                <div class="toast align-items-center text-white ${bgClass} border-0 show" role="alert" style="position:fixed;bottom:20px;right:20px;z-index:10001;min-width:250px;">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="bi ${type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle'}"></i> ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" onclick="this.parentElement.parentElement.remove()"></button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', toastHTML);
+            setTimeout(() => {
+                const toasts = document.querySelectorAll('.toast');
+                if (toasts.length > 0) toasts[toasts.length - 1].remove();
+            }, 3000);
+        }
+
+
+
+        // V5.8.1: Map Editor Functions (Enhanced V5.9)
         function openMapEditor() {
             // Create modal HTML
             const modalHTML = `
@@ -1124,7 +1251,7 @@
                         </button>
                         <div id="cityEditorList" style="max-height:400px;overflow-y:auto;"></div>
                         <div class="d-grid gap-2 mt-3">
-                            <button onclick="saveMapChanges()" class="btn btn-primary">
+                            <button id="btnSaveMap" onclick="saveMapChanges()" class="btn btn-primary">
                                 <i class="bi bi-save"></i> Apply Changes & Reset Simulation
                             </button>
                             <button onclick="closeMapEditor()" class="btn btn-secondary">Cancel</button>
@@ -1154,16 +1281,16 @@
                                         </button>
                                     </div>
                                     <input type="text" class="form-control form-control-sm city-name mb-2" 
-                                           data-city="${name}" value="${name}" style="font-size:11px;">
+                                           data-city="${name}" value="${name}" maxlength="50" style="font-size:11px;">
                                     <div class="row g-1">
                                         <div class="col-6">
                                             <label class="form-label" style="font-size:10px;margin-bottom:2px;">Latitude</label>
-                                            <input type="number" step="0.0001" class="form-control form-control-sm city-lat" 
+                                            <input type="number" step="0.0001" min="-90" max="90" class="form-control form-control-sm city-lat" 
                                                    data-city="${name}" value="${lat}" style="font-size:11px;">
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label" style="font-size:10px;margin-bottom:2px;">Longitude</label>
-                                            <input type="number" step="0.0001" class="form-control form-control-sm city-lon" 
+                                            <input type="number" step="0.0001" min="-180" max="180" class="form-control form-control-sm city-lon" 
                                                    data-city="${name}" value="${lon}" style="font-size:11px;">
                                         </div>
                                     </div>
@@ -1230,33 +1357,75 @@
             }
         }
         function saveMapChanges() {
-            // Collect all current cities (including added/deleted)
+            const btn = document.getElementById('btnSaveMap');
+
+            // Collect all current cities
             const cityCards = document.querySelectorAll('.city-editor-card');
 
             if (cityCards.length === 0) {
-                alert('❌ You must have at least 1 city!');
+                showToast('❌ You must have at least 1 city!', 'error');
                 return;
             }
 
+            // V5.9: Loading State
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+            btn.disabled = true;
+
             const newCities = {};
             let cityIndex = 0;
+            let hasError = false;
 
             cityCards.forEach((card) => {
                 const nameInput = card.querySelector('.city-name');
                 const latInput = card.querySelector('.city-lat');
                 const lonInput = card.querySelector('.city-lon');
 
-                const newName = nameInput.value.trim() || 'Unnamed City';
+                // Frontend Validation Check
+                const nameVal = nameInput.value.trim();
+                if (!nameVal) {
+                    showToast('❌ City name cannot be empty!', 'error');
+                    nameInput.focus();
+                    hasError = true;
+                    return;
+                }
+                if (nameVal.length > 50) {
+                    showToast(`❌ Name too long (max 50 chars): ${nameVal}`, 'error');
+                    nameInput.focus();
+                    hasError = true;
+                    return;
+                }
+
                 const lat = parseFloat(latInput.value);
                 const lon = parseFloat(lonInput.value);
 
+                if (isNaN(lat) || lat < -90 || lat > 90) {
+                    showToast(`❌ Invalid Latitude for ${nameVal}`, 'error');
+                    latInput.focus();
+                    hasError = true;
+                    return;
+                }
+
+                if (isNaN(lon) || lon < -180 || lon > 180) {
+                    showToast(`❌ Invalid Longitude for ${nameVal}`, 'error');
+                    lonInput.focus();
+                    hasError = true;
+                    return;
+                }
+
                 newCities[cityIndex] = {
-                    name: newName,
+                    name: nameVal,
                     lat: lat,
                     lon: lon
                 };
                 cityIndex++;
             });
+
+            if (hasError) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return;
+            }
 
             // Send to backend
             fetch('/api/update_config', {
@@ -1267,14 +1436,133 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert(`✅ Map updated with ${cityIndex} cities! Reloading...`);
-                        closeMapEditor();
-                        location.reload();
+                        showToast(`✅ Map updated! Reloading...`, 'success');
+                        setTimeout(() => {
+                            closeMapEditor();
+                            location.reload();
+                        }, 1000);
                     } else {
-                        alert('❌ Error: ' + data.message);
+                        showToast('❌ Error: ' + data.message, 'error');
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
                     }
                 })
-                .catch(err => alert('❌ Failed: ' + err));
+                .catch(err => {
+                    showToast('❌ Network Error: ' + err, 'error');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+        }
+
+
+        // --- V5.9: INTERVENTION LEARNING LOGIC ---
+
+        var isTeachingMode = false;
+        var lessonRoute = [];
+        var lessonLayer = null;
+
+        function handleCityClick(name) {
+            if (!isTeachingMode) return;
+
+            // Visual feedback
+            lessonRoute.push(name);
+            updateLessonUI();
+        }
+
+        function toggleTeachingMode() {
+            let toggle = document.getElementById('teachModeToggle');
+            isTeachingMode = toggle ? toggle.checked : false;
+
+            let controls = document.getElementById('teachingControls');
+            let instruct = document.getElementById('teachInstructions');
+
+            if (isTeachingMode) {
+                if (controls) controls.classList.remove('d-none');
+                if (instruct) instruct.classList.add('d-none');
+                clearLesson();
+            } else {
+                if (controls) controls.classList.add('d-none');
+                if (instruct) instruct.classList.remove('d-none');
+                clearLesson();
+            }
+        }
+
+        function clearLesson() {
+            lessonRoute = [];
+            if (lessonLayer) { map.removeLayer(lessonLayer); lessonLayer = null; }
+            updateLessonUI();
+        }
+
+        function updateLessonUI() {
+            let list = document.getElementById('lessonRouteList');
+            if (!list) return;
+
+            list.innerHTML = '';
+            let count = document.getElementById('lessonStepCount');
+            if (count) count.textContent = lessonRoute.length + " steps";
+
+            let btn = document.getElementById('btnSubmitLesson');
+            if (btn) btn.disabled = lessonRoute.length < 2;
+
+            if (lessonRoute.length === 0) {
+                list.innerHTML = '<li class="list-group-item text-muted text-center py-1">- Empty -</li>';
+                return;
+            }
+
+            lessonRoute.forEach((city, idx) => {
+                let item = document.createElement('li');
+                item.className = "list-group-item py-1 d-flex justify-content-between";
+                item.innerHTML = `<span><span class="badge bg-primary rounded-circle" style="font-size:8px; width:15px; height:15px; display:inline-flex; align-items:center; justify-content:center;">${idx + 1}</span> ${city}</span>`;
+                list.appendChild(item);
+            });
+
+            // Draw Layer
+            if (lessonLayer) map.removeLayer(lessonLayer);
+            if (lessonRoute.length > 1) {
+                // Find coords
+                let points = lessonRoute.map(n => {
+                    // rawCityData might be key->value or we need to find it 
+                    // rawCityData was loaded in initMap as value of /get_cities
+                    // format: { "CityName": [lat, lon], ... }
+                    return rawCityData[n];
+                });
+
+                lessonLayer = L.polyline(points, { color: '#2ecc71', weight: 4, dashArray: '10, 10' }).addTo(map);
+                // Optional: Fit bounds? Maybe distracting if zooming in/out too much
+                // map.fitBounds(lessonLayer.getBounds(), {padding: [50, 50]});
+            }
+        }
+
+        function submitLesson() {
+            let agent = document.getElementById('teachAgentSelect').value;
+
+            // Visual feedback button
+            let btn = document.getElementById('btnSubmitLesson');
+            let originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Teaching...';
+            btn.disabled = true;
+
+            fetch('/api/teach', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agent: agent, route: lessonRoute })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert("✅ " + data.message);
+                        clearLesson();
+                    } else {
+                        alert("❌ Error: " + data.message);
+                    }
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                })
+                .catch(err => {
+                    alert("Network Error: " + err);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
         }
     </script>
 </body>

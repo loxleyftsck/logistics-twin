@@ -265,8 +265,8 @@ WEATHER_PRESETS = {
     }
 }
 
-top_records = []
-total_episodes = 0
+# V5.9: Removed duplicate globals (migrated to SimulationManager)
+# Legacy variables removed: total_episodes, top_records
 
 # --- 3. API ENDPOINTS ---
 
@@ -282,13 +282,13 @@ def health_check():
     """
     return jsonify({
         "status": "healthy",
-        "version": "V5.8.1",
+        "version": "V5.9.1",
         "agents": len(agents),
         "cities": len(cities_data),
         "disasters": len(active_disasters),
-        "episodes": total_episodes,
+        "episodes": sim_manager.total_episodes,
         "uptime": "running",
-        "features": ["CORS", "Rate-Limiting", "Multi-Stage-Docker", "OSRM-Proxy"]
+        "features": ["CORS", "Rate-Limiting", "Multi-Stage-Docker", "OSRM-Proxy", "Intervention-Learning"]
     }), 200
 
 # V5.6: OSRM Proxy Endpoint with Timeout
@@ -328,11 +328,13 @@ def reset_sim():
     # V5.4: Use SimulationManager
     sim_manager.reset()
     
-    # Reset Physics
+    # V5.9: Proper Architecture - All state managed by SimulationManager
     global shared_matrix
+    
+    # Reset Physics
     shared_matrix[:] = base_matrix.copy()
     
-    for agent in agents:
+    for agent in agents.values():
         agent.q_table.clear()
         agent.epsilon = 1.0
         agent.dist_matrix = shared_matrix 
@@ -511,7 +513,7 @@ def update_disasters(): return sim_manager.update_disasters_lifecycle()
 @limiter.limit("30 per minute")  # P0 Security: Rate limit training endpoint
 def train_step():
     try:
-        global total_episodes # Legacy global
+        # V5.9: Use SimulationManager for episode tracking (removed global)
         
         # Batch Size Kecil agar Browser tidak lag dengan 5 agen
         batch_size = 5 
@@ -555,7 +557,7 @@ def train_step():
                 
                 routes_data.append({
                     'agent': agent_name,
-                    'episode': total_episodes, 
+                    'episode': sim_manager.total_episodes, 
                     'distance': round(dist, 2),
                     'cost': round(total_cost, 0),
                     'profit': round(profit, 0),
@@ -580,7 +582,7 @@ def train_step():
                         sim_manager.top_records = sim_manager.top_records[:5]
                         for i, rec in enumerate(sim_manager.top_records): rec['rank'] = i + 1
         
-        total_episodes += 1
+        sim_manager.total_episodes += 1
         
         # Temporal Disaster Cycle
         expired = sim_manager.update_disasters_lifecycle()
@@ -588,7 +590,7 @@ def train_step():
         return jsonify({
             'routes': routes_data,
             'best_routes': sim_manager.top_records,
-            'episode': total_episodes,
+            'episode': sim_manager.total_episodes,
             'disasters_expired': expired,
             'reputation': sim_manager.reputation
         })
@@ -777,11 +779,34 @@ def update_config():
         # Rebuild dictionary dengan keys integer
         cleaned_cities = {}
         for k, v in new_data.items():
-            # P0 Security Fix #3: Sanitize inputs (prevent XSS)
+            # P0 Security Fix (V5.9): Strict Validation Logic
+            
+            # 1. Validate Types
+            if not isinstance(v.get('lat'), (int, float)) or not isinstance(v.get('lon'), (int, float)):
+                return jsonify({"status": "error", "message": f"Invalid coordinate type for city ID {k}"}), 400
+                
+            lat = float(v['lat'])
+            lon = float(v['lon'])
+            
+            # 2. Validate Bounds (Tech Limits)
+            # Future: Context-aware bounds (e.g., Indonesia only)? For now, global limits.
+            if not (-90 <= lat <= 90):
+                return jsonify({"status": "error", "message": f"Latitude {lat} out of bounds (-90 to 90)"}), 400
+            if not (-180 <= lon <= 180):
+                 return jsonify({"status": "error", "message": f"Longitude {lon} out of bounds (-180 to 180)"}), 400
+
+            # 3. Validate Name
+            raw_name = str(v.get('name', 'Unnamed'))
+            if len(raw_name) > 50:
+                 return jsonify({"status": "error", "message": f"City name too long (max 50 chars): {raw_name[:20]}..."}), 400
+            
+            # 4. Sanitize Input
+            sanitized_name = html.escape(raw_name)
+
             cleaned_cities[int(k)] = {
-                'name': html.escape(str(v['name'])[:50]),  # Max 50 chars, escape HTML
-                'lat': max(-90, min(90, float(v['lat']))),  # Clamp latitude range
-                'lon': max(-180, min(180, float(v['lon'])))  # Clamp longitude range
+                'name': sanitized_name,
+                'lat': lat,
+                'lon': lon
             }
             
         # 1. Update Global Data
@@ -813,6 +838,57 @@ def update_config():
         
     except Exception as e:
         print(f"Config Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/teach', methods=['POST'])
+@limiter.limit("10 per minute") # Security: Prevent spamming
+def teach_agent():
+    """
+    V5.9: Intervention Learning Endpoint
+    Allows manual demonstration of routes to train agents.
+    """
+    try:
+        data = request.json
+        agent_name = data.get('agent')
+        route_names = data.get('route')
+        
+        if not agent_name or not route_names:
+            return jsonify({"status": "error", "message": "Missing agent or route data"}), 400
+            
+        if not isinstance(route_names, list):
+             return jsonify({"status": "error", "message": "Route must be a list"}), 400
+
+        # Security: Cap route length to prevent DoS
+        if len(route_names) > 50:
+             return jsonify({"status": "error", "message": "Route too long (max 50 cities)"}), 400
+
+        if len(route_names) < 2:
+             return jsonify({"status": "error", "message": "Route must have at least 2 cities"}), 400
+
+        if agent_name not in agents:
+             return jsonify({"status": "error", "message": "Agent not found"}), 404
+             
+        target_agent = agents[agent_name]
+        
+        # Convert city names to indices
+        name_to_id = {v['name']: k for k, v in cities_data.items()}
+        route_indices = []
+        
+        for name in route_names:
+            if name not in name_to_id:
+                return jsonify({"status": "error", "message": f"City '{name}' not found"}), 400
+            route_indices.append(name_to_id[name])
+            
+        # Call Reinforcement with High Alpha (Human Override)
+        target_agent.reinforce_route(route_indices, alpha_override=0.8)
+        
+        return jsonify({
+            "status": "success", 
+            "message": f"{agent_name} successfully taught route ({len(route_indices)} cities)",
+            "learned_route": route_names
+        })
+        
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # --- V4.9: BRAIN PERSISTENCE (SAVE/LOAD Q-TABLE) ---
