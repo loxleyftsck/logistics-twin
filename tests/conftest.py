@@ -45,13 +45,15 @@ def runner(app):
 @pytest.fixture
 def sample_cities():
     """Provide sample city data for testing TSP algorithms."""
-    return [
-        {"id": 0, "name": "City A", "lat": 0.0, "lng": 0.0},
-        {"id": 1, "name": "City B", "lat": 1.0, "lng": 1.0},
-        {"id": 2, "name": "City C", "lat": 2.0, "lng": 2.0},
-        {"id": 3, "name": "City D", "lat": 3.0, "lng": 3.0},
-        {"id": 4, "name": "City E", "lat": 4.0, "lng": 4.0}
-    ]
+    # Return dict format expected by create_distance_matrix
+    return {
+        0: {"lat": 0.0, "lon": 0.0},
+        1: {"lat": 1.0, "lon": 1.0},
+        2: {"lat": 2.0, "lon": 2.0},
+        3: {"lat": 3.0, "lon": 3.0},
+        4: {"lat": 4.0, "lon": 4.0}
+    }
+
 
 
 @pytest.fixture
