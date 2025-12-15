@@ -343,9 +343,13 @@ class TSPBaseAgent:
                         improved = True
         return best_route
 
-    def reinforce_route(self, route):
-        """Memasukkan rute bagus (hasil 2-OPT) ke dalam Q-Table"""
+    def reinforce_route(self, route, alpha_override=None):
+        """Memasukkan rute bagus (hasil 2-OPT atau Manual Teacher) ke dalam Q-Table"""
         mask = 1 << route[0]
+        
+        # Use provided alpha or default agent's alpha
+        learning_rate = alpha_override if alpha_override is not None else self.alpha
+        
         for i in range(len(route)-1):
             curr, next_node = route[i], route[i+1]
             state = self.get_state(curr, mask)
@@ -365,7 +369,7 @@ class TSPBaseAgent:
                 if qs: max_next_q = max(qs)
             
             current_q = self.q_table[state][next_node]
-            self.q_table[state][next_node] = current_q + self.alpha * (reward + (self.gamma * max_next_q) - current_q)
+            self.q_table[state][next_node] = current_q + learning_rate * (reward + (self.gamma * max_next_q) - current_q)
             
             mask = next_mask
 
